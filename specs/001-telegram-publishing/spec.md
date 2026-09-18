@@ -26,6 +26,9 @@ choose the implementation language or CI syntax yet."
 - Q: What should identify a post in the delivery ledger, so the pipeline can tell new posts apart from already-delivered ones? → A: The repository-relative file path; renaming a post makes it look new (documented v1 limitation).
 - Q: When a single commit adds several new Markdown posts, what should one pipeline run publish? → A: All new posts in the run, alphabetical by file path, with spacing between messages.
 - Q: When the Telegram service temporarily fails mid-delivery, how should the pipeline handle retries before it gives up and fails the CI run? → A: Bounded retry, up to 3 attempts per message with increasing waits; the run still fails if delivery never succeeds.
+- Q: When the pipeline decides whether a Markdown post is new, what should it use as the identity of the post in the delivery ledger? → A: The repository-relative file path only; renamed posts publish again and recreated posts at the same path are skipped (both documented limitations).
+- Q: Until the ledger commit-back exists (User Story 3), how should early pipeline milestones be run so the test channel is not spammed on every CI run? → A: Local and manual runs only; unattended CI is enabled only after User Story 3 completes idempotency.
+- Q: Where should the rule that only one publishing run happens at a time per channel be enforced? → A: In the CI wrapper, using platform run-serialization controls (GitHub concurrency groups, GitLab resource groups); the pipeline core stays platform-neutral.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -126,6 +129,9 @@ and verifying the second run delivers nothing new and still exits with success.
   future enhancement).
 - What happens when a message is still undelivered after all retry attempts? -> the run
   fails with the post named in the log; the next run delivers only what is still missing.
+- What happens when a post is deleted and a different post is created at the same path? -> it
+  is skipped (the ledger still holds the old delivery); accepted limitation, resolved by a
+  frontmatter identity in a future version.
 
 ## Requirements *(mandatory)*
 
@@ -167,8 +173,9 @@ and verifying the second run delivers nothing new and still exits with success.
 - **FR-011**: The pipeline MUST NOT depend on features exclusive to one CI platform; it MUST
   be reproducible and runnable on the organization's self-hosted GitLab after migration,
   with re-hosting requiring only configuration and secret re-entry.
-- **FR-012**: Overlapping runs MUST NOT produce duplicate posts; delivery per channel MUST
-  effectively serialize.
+- **FR-012**: Overlapping runs MUST NOT produce duplicate posts; single-run-per-channel is
+  enforced by the CI wrapper using platform run-serialization controls (GitHub concurrency
+  groups, GitLab resource groups), keeping the pipeline core platform-neutral.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -213,6 +220,8 @@ and verifying the second run delivers nothing new and still exits with success.
   runs. Scheduled or queued publishing is out of scope for the first version.
 - Only newly added posts are published in this version; re-publishing on edits to
   already-published posts is a future extension.
+- Unattended CI operation MUST NOT be enabled before ledger commit-back exists (User Story
+  3 complete); early milestones run locally or with manual triggers only.
 - Content selection: Markdown posts under `posts/` that are not yet recorded in the committed
   ledger file `delivery/ledger.json` get published, so behavior is identical on any supported
   CI platform.

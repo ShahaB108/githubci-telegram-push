@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Telegram Publishing Automation
+# Specification Quality Checklist: Markdown-to-Telegram Publishing Pipeline
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-18
@@ -31,9 +31,12 @@
 
 ## Notes
 
-- All items validated 2026-09-18; zero clarification markers remain - informed defaults are
-  documented in the spec's Assumptions section.
-- Scope boundary confirmed with governance: Telegram-only for the first version; LinkedIn and
-  other channels are future extensions.
+- Spec revised 2026-09-18 with the authoritative user description (test repository now,
+  migration to DevOps Farsi self-hosted GitLab later; new-post detection; credentials via
+  CI/CD secrets only; CI fails on publishing failure; useful logs; Telegram-only scope).
+- Implementation language and CI workflow syntax intentionally deferred to `/speckit-plan`
+  per the user's instruction; the spec stays technology-agnostic.
+- All items re-validated 2026-09-18; zero clarification markers remain - informed defaults
+  are documented in the spec's Assumptions section.
 - Ready for `/speckit-plan` (running `/speckit-clarify` first is optional since no markers
   remain).

@@ -1,0 +1,15 @@
+## Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.env*
+!.env.example
+.ledger-*.tmp
+.DS_Store
+Thumbs.db

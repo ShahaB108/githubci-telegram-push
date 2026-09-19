@@ -52,3 +52,9 @@ The pipeline reads configuration ONLY from the environment; no config files, no 
 After a run that changed delivery state, the pipeline commits `delivery/ledger.json` with the
 message prefix `chore(delivery):` and pushes to the default branch. CI wrappers MUST skip
 triggering a publishing run when a push only touches `delivery/` (loop guard, decision R4).
+
+## Run serialization
+
+Enforcing single-run-per-channel (spec FR-012) is a CI wrapper responsibility:
+GitHub Actions MUST use a concurrency group per channel; GitLab CI MUST use a
+resource_group. The pipeline core itself MUST NOT implement its own locking.

@@ -1,0 +1,13 @@
+{
+  "records": [
+    {
+      "delivered_at": "2026-09-20T12:46:27.106306+00:00",
+      "message_ids": [
+        702
+      ],
+      "post_path": "posts/testfile.md",
+      "status": "delivered"
+    }
+  ],
+  "version": 1
+}

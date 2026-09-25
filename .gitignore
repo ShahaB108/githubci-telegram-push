@@ -13,3 +13,5 @@ dist/
 .ledger-*.tmp
 .DS_Store
 Thumbs.db
+.specify/
+.clinerules/

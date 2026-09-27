@@ -70,10 +70,13 @@ jobs:
           ledger="$RUNNER_TEMP/ledger.json"
           content=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \
             --jq .content 2>/dev/null || true)
-          if [ -n "$content" ] && [ "$content" != "null" ]; then
-            printf '%s' "$content" | base64 -d > "$ledger"
+          echo "debug: content length=${#content}, repr=$(printf '%s' "$content" | head -c 40 | cat -A)"
+          if [ -n "$content" ] && [ "$content" != "null" ] && \
+             printf '%s' "$content" | base64 -d > "$ledger" 2>/dev/null; then
+            echo "restored existing ledger from $STATE_BRANCH"
           else
             printf '{\n  "version": 1,\n  "records": []\n}\n' > "$ledger"
+            echo "no usable ledger on $STATE_BRANCH - starting fresh"
           fi
           cp "$ledger" "$RUNNER_TEMP/original.json"
           sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \

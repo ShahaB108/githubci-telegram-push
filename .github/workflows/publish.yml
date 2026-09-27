@@ -5,8 +5,15 @@ on:
     branches:
       - main
     paths:
-      - 'posts/**'
+      - '*.md'
+      - 'engine/**'
+      - '.github/workflows/publish.yml'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Plan deliveries only - nothing is sent to Telegram'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -14,6 +21,16 @@ permissions:
 concurrency:
   group: telegram-publish-${{ github.ref }}
   cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: engine
+
+env:
+  # Delivery state lives on its own branch so the mirrored `main` never diverges:
+  # GitLab owns `main`, this repository owns `delivery-state`.
+  STATE_BRANCH: delivery-state
+  STATE_FILE: delivery/ledger.json
 
 jobs:
   quality-gate:
@@ -40,14 +57,57 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Configure git for ledger commit-back
+      - name: Reserve the state branch name
         run: |
-          git config user.name "pipeline-bot"
-          git config user.email "pipeline-bot@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+            echo "::error::'$STATE_BRANCH' is reserved for pipeline state - rename the branch you pushed."
+            exit 1
+          fi
+      - name: Restore delivery state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ledger="$RUNNER_TEMP/ledger.json"
+          content=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \
+            --jq .content 2>/dev/null || true)
+          if [ -n "$content" ]; then
+            printf '%s' "$content" | base64 -d > "$ledger"
+          else
+            printf '{\n  "version": 1,\n  "records": []\n}\n' > "$ledger"
+          fi
+          cp "$ledger" "$RUNNER_TEMP/original.json"
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \
+            --jq .sha 2>/dev/null || true)
+          printf '%s' "$sha" > "$RUNNER_TEMP/state.sha"
       - name: Publish new posts to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python -m pipeline.main
-      - name: Push ledger updates
-        run: git push
+          PIPELINE_LEDGER_PATH: ${{ runner.temp }}/ledger.json
+          PIPELINE_COMMIT: '0'
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python -m pipeline.main $DRY_RUN
+      - name: Persist delivery state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ledger="$RUNNER_TEMP/ledger.json"
+          if cmp -s "$RUNNER_TEMP/original.json" "$ledger"; then
+            echo "delivery state unchanged"
+            exit 0
+          fi
+          if ! gh api "repos/$GITHUB_REPOSITORY/branches/$STATE_BRANCH" >/dev/null 2>&1; then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$STATE_BRANCH" \
+              -f sha="$(git rev-parse HEAD)" >/dev/null
+            : > "$RUNNER_TEMP/state.sha"
+          fi
+          sha=$(cat "$RUNNER_TEMP/state.sha")
+          args=(-X PUT "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE" \
+                -f message="chore(delivery): record deliveries" \
+                -f branch="$STATE_BRANCH" \
+                -f content="$(base64 -w0 "$ledger")")
+          if [ -n "$sha" ]; then
+            args+=(-f sha="$sha")
+          fi
+          gh api "${args[@]}" >/dev/null

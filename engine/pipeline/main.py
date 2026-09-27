@@ -1,8 +1,8 @@
 """CLI entry point: detect -> convert -> deliver -> record.
 
-Implements the interface contract in specs/001-telegram-publishing/contracts/
-pipeline-interface.md: flags, environment configuration, exit codes, run summary,
-and the ledger commit-back with the chore(delivery): prefix (FR-002..FR-010).
+Implements the pipeline interface contract: flags, environment configuration, exit
+codes, run summary, and the ledger commit-back with the chore(delivery): prefix
+(FR-002..FR-010). Post identity in the ledger is always repository-root relative.
 """
 
 import argparse
@@ -55,8 +55,8 @@ def _run(args):
     ledger = ledger_mod.load(config.ledger_path)
     original = ledger_mod.snapshot(ledger)
     considered, to_publish, skipped = [], [], []
-    for full_path in detect_mod.discover_posts(config.posts_dir):
-        relative = _relative(full_path)
+    for full_path in detect_mod.discover_posts(config.posts_dir, config.ignored_names):
+        relative = _relative(full_path, config.repo_root)
         considered.append(relative)
         record = ledger_mod.record_for(ledger, relative)
         meta, body = detect_mod.parse_post(full_path)
@@ -123,7 +123,8 @@ def _persist(args, config, ledger, original):
     if args.dry_run or ledger == original:
         return
     ledger_mod.save(config.ledger_path, ledger)
-    _commit_ledger(config)
+    if config.commit_ledger:
+        _commit_ledger(config)
 
 
 def _commit_ledger(config):
@@ -150,8 +151,13 @@ def _title(meta, body, relative):
     return os.path.splitext(os.path.basename(relative))[0]
 
 
-def _relative(full_path):
-    return full_path.replace(os.sep, "/")
+def _relative(full_path, repo_root):
+    """Ledger identity: repository-root relative, forward slashes (stable across hosts)."""
+    try:
+        relative = os.path.relpath(full_path, repo_root)
+    except ValueError:  # different drive on Windows: keep the absolute path
+        relative = full_path
+    return relative.replace(os.sep, "/")
 
 
 def _now():

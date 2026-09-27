@@ -49,3 +49,20 @@ def test_is_draft():
     assert is_draft({"draft": True}) is True
     assert is_draft({}) is False
     assert is_draft({"draft": False}) is False
+
+
+def test_discover_skips_repo_documents_and_dotfiles(env, write_post):
+    write_post("a.md")
+    for name in ("README.md", "changelog.md", ".hidden.md"):
+        (env / "posts" / name).write_text("not a post", encoding="utf-8")
+    paths = discover_posts(str(env / "posts"))
+    names = [path.replace("\\", "/").rsplit("/", 1)[-1] for path in paths]
+    assert names == ["a.md"]
+
+
+def test_discover_honours_custom_ignore_list(env, write_post):
+    write_post("INDEX.md")
+    write_post("a.md")
+    paths = discover_posts(str(env / "posts"), ignore=["index.md"])
+    names = [path.replace("\\", "/").rsplit("/", 1)[-1] for path in paths]
+    assert names == ["a.md"]

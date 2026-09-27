@@ -12,6 +12,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "@test_channel")
     monkeypatch.setenv("PIPELINE_POSTS_DIR", str(posts_dir))
     monkeypatch.setenv("PIPELINE_LEDGER_PATH", str(tmp_path / "delivery" / "ledger.json"))
+    monkeypatch.setenv("PIPELINE_REPO_ROOT", str(tmp_path))
     return tmp_path
 
 

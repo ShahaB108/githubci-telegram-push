@@ -39,7 +39,7 @@ def test_happy_path_exit_zero_and_ledger_updated(env, write_post, monkeypatch, c
     ledger_path = env / "delivery" / "ledger.json"
     assert ledger_path.exists()
     records = json.loads(ledger_path.read_text(encoding="utf-8"))["records"]
-    assert records[0]["post_path"].endswith("posts/hello.md")
+    assert records[0]["post_path"] == "posts/hello.md"
     assert records[0]["status"] == "delivered"
     assert calls[0]["payload"]["parse_mode"] == "HTML"
     assert calls[0]["payload"]["chat_id"] == "@test_channel"

@@ -49,6 +49,19 @@ def test_ledger_committed_with_chore_prefix(env, write_post, monkeypatch):
     assert any(command == "git push" for command in joined)
 
 
+def test_commit_back_can_be_disabled_for_external_state(env, write_post, monkeypatch):
+    """CI runs with PIPELINE_COMMIT=0: state is saved, but no git command is emitted."""
+    write_post("hello.md")
+    install_fake_post(monkeypatch)
+    commands = install_git_spy(monkeypatch)
+    monkeypatch.setenv("PIPELINE_COMMIT", "0")
+    assert main_mod.main([]) == 0
+    assert commands == []
+    ledger_path = env / "delivery" / "ledger.json"
+    records = json.loads(ledger_path.read_text(encoding="utf-8"))["records"]
+    assert records[0]["status"] == "delivered"
+
+
 def test_second_run_delivers_nothing_new(env, write_post, monkeypatch, capsys):
     write_post("hello.md")
     calls = install_fake_post(monkeypatch)
@@ -61,7 +74,7 @@ def test_second_run_delivers_nothing_new(env, write_post, monkeypatch, capsys):
 
 def test_partial_delivery_resumes_remaining_parts(env, write_post, monkeypatch):
     write_post("long.md", body="sentence " * 1400)
-    identity = str(env / "posts" / "long.md").replace("\\", "/")
+    identity = "posts/long.md"  # ledger identity is repository-root relative
     ledger_path = env / "delivery" / "ledger.json"
     ledger_path.parent.mkdir(exist_ok=True)
     ledger_path.write_text(json.dumps({

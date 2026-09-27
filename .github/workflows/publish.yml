@@ -59,7 +59,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Reserve the state branch name
         run: |
-          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null 2>&1; then
+          if [ "${GITHUB_REF_NAME}" = "$STATE_BRANCH" ]; then
             echo "::error::'$STATE_BRANCH' is reserved for pipeline state - rename the branch you pushed."
             exit 1
           fi

@@ -70,7 +70,7 @@ jobs:
           ledger="$RUNNER_TEMP/ledger.json"
           content=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \
             --jq .content 2>/dev/null || true)
-          if [ -n "$content" ]; then
+          if [ -n "$content" ] && [ "$content" != "null" ]; then
             printf '%s' "$content" | base64 -d > "$ledger"
           else
             printf '{\n  "version": 1,\n  "records": []\n}\n' > "$ledger"
@@ -78,6 +78,7 @@ jobs:
           cp "$ledger" "$RUNNER_TEMP/original.json"
           sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$STATE_FILE?ref=$STATE_BRANCH" \
             --jq .sha 2>/dev/null || true)
+          [ "$sha" = "null" ] && sha=""
           printf '%s' "$sha" > "$RUNNER_TEMP/state.sha"
       - name: Publish new posts to Telegram
         env:

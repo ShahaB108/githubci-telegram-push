@@ -42,3 +42,16 @@ def test_images_degrade_to_text():
     html = to_telegram_html("![alt text](img.png)")
     assert "<img" not in html
     assert "alt text" in html
+
+
+def test_fenced_code_block_keeps_language_hint():
+    html = to_telegram_html("```bash\necho hi\n```")
+    assert '<pre><code class="language-bash">' in html
+
+
+def test_table_becomes_aligned_monospace_block():
+    html = to_telegram_html("| a | bb |\n| - | - |\n| 1 | 2 |")
+    assert "<table>" not in html
+    assert html.strip().startswith("<pre>")
+    assert "a  bb" in html          # header row with padded columns
+    assert "1  2" in html           # data row aligned under the header

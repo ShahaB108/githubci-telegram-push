@@ -58,3 +58,12 @@ def test_dry_run_prints_plan_and_writes_nothing(env, write_post, monkeypatch, ca
 def test_nothing_to_publish_exits_zero(env, capsys):
     assert main_mod.main([]) == 0
     assert "nothing to publish" in capsys.readouterr().out
+
+
+def test_post_renders_content_only_without_filename(env, write_post, monkeypatch):
+    write_post("hello.md", body="# Heading\n\nBody **text**.")
+    calls = install_fake_post(monkeypatch)
+    assert main_mod.main([]) == 0
+    text = calls[0]["payload"]["text"]
+    assert "hello.md" not in text
+    assert text.startswith("<b>Heading</b>")

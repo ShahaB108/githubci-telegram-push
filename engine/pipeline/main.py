@@ -7,7 +7,6 @@ codes, run summary, and the ledger commit-back with the chore(delivery): prefix
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -68,8 +67,7 @@ def _run(args):
             skipped.append(relative)
             print(f"skipped {relative}: already delivered")
             continue
-        to_publish.append({"path": relative, "record": record,
-                           "meta": meta, "body": body})
+        to_publish.append({"path": relative, "record": record, "body": body})
     if args.limit is not None:
         to_publish = to_publish[: args.limit]
     if not to_publish:
@@ -89,9 +87,7 @@ def _run(args):
 
 def _deliver_entry(args, config, ledger, entry, delivered):
     relative, record = entry["path"], entry["record"]
-    title = _title(entry["meta"], entry["body"], relative)
-    message = convert.build_message(title, convert.to_telegram_html(entry["body"]))
-    parts = convert.split_message(message)
+    parts = convert.split_message(convert.to_telegram_html(entry["body"]))
     if args.dry_run:
         print(f"would deliver {relative} ({len(parts)} part(s))")
         return
@@ -140,15 +136,6 @@ def _commit_ledger(config):
                 (completed.stderr or completed.stdout or "").strip()),
                 file=sys.stderr)
             return
-
-
-def _title(meta, body, relative):
-    if meta.get("title"):
-        return str(meta["title"])
-    match = re.match(r"^#\s+(.+)$", body.strip(), flags=re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    return os.path.splitext(os.path.basename(relative))[0]
 
 
 def _relative(full_path, repo_root):

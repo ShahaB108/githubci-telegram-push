@@ -1,10 +1,13 @@
 """Markdown to Telegram HTML conversion and message splitting (FR-004, FR-010).
 
-Allowed Telegram tags: b, i, u, s, code, pre, a[href]. Everything else degrades to
-plain text (spec edge case: formatting alone never fails a delivery).
+Telegram renders only a small HTML subset (b, i, u, s, code, pre, a[href]). Markdown
+constructs without a Telegram equivalent are rewritten so the post stays readable:
+tables become aligned monospace blocks, fenced code blocks keep their language hint,
+and everything else degrades to plain text (formatting alone never fails a delivery).
 """
 
 import re
+import unicodedata
 
 import markdown as md_lib
 
@@ -12,13 +15,15 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 _MARKER_RESERVE = 24  # room for the "Part N/M" marker appended to every part
 
 _ALLOWED_TAG_PATTERN = re.compile(
-    r'</?a\s+href="[^"]*"\s*>|</?a>|</?(?:b|i|u|s|code|pre)>')
+    r'</?a\s+href="[^"]*"\s*>|</?a>|</?(?:b|i|u|s|pre)>'
+    r'|</?code(?:\s+class="language-[\w+#.-]*")?>')
 
 
 def to_telegram_html(markdown_text):
     """Convert Markdown into the Telegram HTML subset."""
     text = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", markdown_text or "")
-    html_text = md_lib.markdown(text)
+    html_text = md_lib.markdown(text, extensions=["fenced_code", "tables"])
+    html_text = _tables_to_pre(html_text)
     html_text = re.sub(r"<h([1-6])>(.*?)</h\1>", r"<b>\2</b>", html_text,
                        flags=re.DOTALL)
     html_text = html_text.replace("<strong>", "<b>").replace("</strong>", "</b>")
@@ -35,9 +40,28 @@ def to_telegram_html(markdown_text):
     return _escape_disallowed(html_text)
 
 
-def build_message(title, body_html):
-    """Prepend the bolded title to the converted body (FR-004)."""
-    return f"<b>{title}</b>\n\n{body_html}".strip()
+def _tables_to_pre(html_text):
+    """Render Markdown tables as aligned monospace blocks; Telegram has no <table>."""
+
+    def _render(match):
+        grid = [[re.sub(r"<[^>]+>", "", cell).strip()
+                 for cell in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, flags=re.DOTALL)]
+                for row in re.findall(r"<tr[^>]*>(.*?)</tr>", match.group(0), flags=re.DOTALL)]
+        if not grid or not grid[0]:
+            return ""
+        widths = [max(_display_width(row[index]) if index < len(row) else 0
+                      for row in grid) for index in range(len(grid[0]))]
+        lines = ["  ".join(cell + " " * (widths[index] - _display_width(cell))
+                           for index, cell in enumerate(row)).rstrip()
+                 for row in grid]
+        return "<pre>{}</pre>".format("\n".join(lines))
+
+    return re.sub(r"<table[^>]*>.*?</table>", _render, html_text, flags=re.DOTALL)
+
+
+def _display_width(text):
+    """Monospace column width: East Asian wide/fullwidth characters take two columns."""
+    return sum(2 if unicodedata.east_asian_width(char) in "WF" else 1 for char in text)
 
 
 def split_message(text, limit=TELEGRAM_MESSAGE_LIMIT):
